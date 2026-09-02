@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import engine, Base, SessionLocal
 from app.models.user import User
 from app.models.ticket import Ticket
-from app.routers import auth, tickets, admin
+from app.routers import auth, tickets, admin, chatbot
 from app.seed import seed_database
 
 
@@ -59,6 +59,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(admin.router)
+app.include_router(chatbot.router)
 
 
 @app.get("/")

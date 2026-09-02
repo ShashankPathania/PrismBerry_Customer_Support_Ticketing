@@ -8,6 +8,8 @@ import Sidebar from './Sidebar';
 import { Menu, Ticket } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+import ChatbotWidget from './ChatbotWidget';
+
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
@@ -39,6 +41,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Floating AI Chatbot Widget for Clients */}
+      <ChatbotWidget />
     </div>
   );
 }
