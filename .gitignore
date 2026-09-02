@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+backend/venv/
+backend/env/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database & SQLite files
+*.db
+*.sqlite
+*.sqlite3
+support_tickets.db
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# File uploads (local attachments)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Frontend build output
+frontend/dist/
+frontend/dist-ssr/
+frontend/node_modules/
+*.local
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
