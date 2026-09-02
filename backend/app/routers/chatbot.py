@@ -4,10 +4,13 @@ Powered by Groq LLM API (llama-3.1-8b-instant).
 """
 import os
 import json
+import logging
+from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 
 from app.models.user import User
 from app.models.ticket import Ticket
@@ -16,9 +19,14 @@ from app.services.triage import classify_ticket
 from app.services.assignment import assign_agent
 from app.routers.tickets import _ticket_to_response, _generate_ticket_number
 
-router = APIRouter(prefix="/api/chatbot", tags=["AI Chatbot"])
+# Explicitly load .env from the backend directory
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
 
-GROQ_MODEL = "llama-3.1-8b-instant"
+router = APIRouter(prefix="/api/chatbot", tags=["AI Chatbot"])
+logger = logging.getLogger("uvicorn.error")
+
+GROQ_MODEL = "qwen/qwen3.6-27b"
 
 
 # --- Schemas ---
@@ -49,6 +57,12 @@ class SuggestReplyResponse(BaseModel):
     key_points: List[str]
 
 
+def _get_groq_key() -> str:
+    """Reload and return the Groq API key, supporting hot-reload."""
+    load_dotenv(dotenv_path=_env_path, override=True)
+    return os.getenv("GROQ_API_KEY", "").strip()
+
+
 @router.post("/chat", response_model=ChatResponse)
 def client_chat(
     req: ChatRequest,
@@ -59,10 +73,10 @@ def client_chat(
     Customer-facing AI assistant endpoint.
     Answers support questions or automatically raises a ticket if requested.
     """
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    api_key = _get_groq_key()
 
-    # Rule-based fallback if GROQ_API_KEY is not set
     if not api_key:
+        logger.warning("[CHATBOT] GROQ_API_KEY is empty — using fallback.")
         return _fallback_client_chat(req.message, current_user, db)
 
     try:
@@ -74,7 +88,7 @@ Your user's name is {current_user.name} ({current_user.email}).
 
 Capabilities:
 1. Provide helpful, empathetic troubleshooting advice for technical, billing, or account questions.
-2. If the user explicitly asks to open, raise, or create a ticket, OR if their issue requires agent intervention, you can create a ticket on their behalf!
+2. If the user explicitly asks to open, raise, or create a ticket, OR if their issue clearly requires human agent intervention (e.g. payment failures, system outages, account locks), you SHOULD create a ticket on their behalf.
 
 Output Format:
 You MUST respond with valid JSON containing:
@@ -86,12 +100,14 @@ You MUST respond with valid JSON containing:
 }}
 
 Guidelines:
-- If user wants to open a ticket, set "intent": "create_ticket", provide "ticket_subject" and "ticket_description", and explain in "reply" that you are opening ticket for them.
-- If user is asking a general question or chatting, set "intent": "answer", set ticket_subject and ticket_description to null.
-- Keep replies friendly, concise, and helpful."""
+- If the user describes a concrete problem (payment failed, website error, account locked, etc.), set "intent": "create_ticket" and provide both "ticket_subject" and "ticket_description".
+- If user wants to open a ticket, set "intent": "create_ticket".
+- If user is asking a general question, greeting, or chatting casually, set "intent": "answer", set ticket_subject and ticket_description to null.
+- Keep replies friendly, concise, and helpful.
+- Always respond in the same language the user writes in."""
 
         messages = [{"role": "system", "content": system_prompt}]
-        for h in req.history[-4:]:  # last 4 messages context
+        for h in (req.history or [])[-6:]:  # last 6 messages context
             messages.append({"role": h.role, "content": h.content})
         messages.append({"role": "user", "content": req.message})
 
@@ -132,7 +148,11 @@ Guidelines:
             db.commit()
             db.refresh(ticket)
 
-            ticket_msg = f"{reply_text}\n\n✅ Ticket #{ticket.ticket_number} has been created and assigned to the {ticket.department} team ({classification['urgency']} priority)."
+            ticket_msg = (
+                f"{reply_text}\n\n"
+                f"Ticket #{ticket.ticket_number} has been created and assigned to the "
+                f"{ticket.department} team ({classification['urgency']} priority)."
+            )
 
             return ChatResponse(
                 reply=ticket_msg,
@@ -144,7 +164,7 @@ Guidelines:
         return ChatResponse(reply=reply_text)
 
     except Exception as e:
-        print(f"[CHATBOT ERROR] {e}")
+        logger.error(f"[CHATBOT ERROR] Groq API call failed: {e}")
         return _fallback_client_chat(req.message, current_user, db)
 
 
@@ -152,8 +172,15 @@ def _fallback_client_chat(msg: str, user: User, db: Session) -> ChatResponse:
     """Fallback response if LLM API is unavailable."""
     msg_lower = msg.lower()
 
-    if any(kw in msg_lower for kw in ["ticket", "create", "open", "raise", "help me"]):
-        subj = f"Support Request from {user.name}"
+    # Broader keyword matching for ticket creation intent
+    ticket_keywords = [
+        "ticket", "create", "open", "raise", "help me", "submit",
+        "report", "issue", "problem", "error", "failed", "broken",
+        "not working", "crash", "payment", "refund", "locked",
+    ]
+
+    if any(kw in msg_lower for kw in ticket_keywords):
+        subj = msg[:80] if len(msg) > 10 else f"Support Request from {user.name}"
         desc = msg
         classification = classify_ticket(subj, desc)
         agent_id = assign_agent(db, classification["department"])
@@ -174,14 +201,25 @@ def _fallback_client_chat(msg: str, user: User, db: Session) -> ChatResponse:
         db.refresh(ticket)
 
         return ChatResponse(
-            reply=f"I have created a support ticket #{ticket.ticket_number} for you in {ticket.department}.",
+            reply=(
+                f"I've created support ticket #{ticket.ticket_number} for you.\n"
+                f"Department: {ticket.department} | Priority: {ticket.urgency}\n"
+                f"A support agent will be in touch shortly."
+            ),
             ticket_created=True,
             ticket_number=ticket.ticket_number,
             ticket_id=ticket.id,
         )
 
     return ChatResponse(
-        reply="Hello! I am your AI Support Assistant. You can ask me troubleshooting questions, or say 'create a ticket' to automatically submit a new support request!"
+        reply=(
+            f"Hello {user.name}! I'm your AI Support Assistant.\n\n"
+            "I can help you with:\n"
+            "- Troubleshooting technical issues\n"
+            "- Billing & payment questions\n"
+            "- Account access problems\n\n"
+            "Describe your issue and I'll either help directly or create a support ticket for you!"
+        )
     )
 
 
@@ -202,11 +240,16 @@ def suggest_agent_reply(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    api_key = _get_groq_key()
 
     if not api_key:
         return SuggestReplyResponse(
-            suggested_reply=f"Hello {ticket.client.name if ticket.client else 'Customer'},\n\nThank you for reaching out regarding: '{ticket.subject}'. We are reviewing your issue and working on a resolution.\n\nBest regards,\n{current_user.name}\n{ticket.department}",
+            suggested_reply=(
+                f"Hello {ticket.client.name if ticket.client else 'Customer'},\n\n"
+                f"Thank you for reaching out regarding: '{ticket.subject}'. "
+                f"We are reviewing your issue and working on a resolution.\n\n"
+                f"Best regards,\n{current_user.name}\n{ticket.department}"
+            ),
             key_points=["Confirm receipt of request", "Provide estimated review timeframe", "Request additional logs if needed"]
         )
 
@@ -251,8 +294,13 @@ Output MUST be JSON:
         )
 
     except Exception as e:
-        print(f"[AI SUGGESTION ERROR] {e}")
+        logger.error(f"[AI SUGGESTION ERROR] {e}")
         return SuggestReplyResponse(
-            suggested_reply=f"Hello {ticket.client.name if ticket.client else 'Customer'},\n\nThank you for contacting {ticket.department} regarding '{ticket.subject}'. I am reviewing the issue and will follow up shortly.\n\nBest regards,\n{current_user.name}",
+            suggested_reply=(
+                f"Hello {ticket.client.name if ticket.client else 'Customer'},\n\n"
+                f"Thank you for contacting {ticket.department} regarding '{ticket.subject}'. "
+                f"I am reviewing the issue and will follow up shortly.\n\n"
+                f"Best regards,\n{current_user.name}"
+            ),
             key_points=["Acknowledge client concern", "Assure investigation", "Provide direct support contact"]
         )

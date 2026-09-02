@@ -25,7 +25,7 @@ export default function ChatbotWidget() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `Hello ${user?.name || 'there'}! 👋 I'm your AI Support Assistant powered by Groq Llama 3.1.\n\nHow can I help you today? You can ask me troubleshooting questions or ask me to "raise a ticket" for your issue!`,
+      content: `Hello ${user?.name || 'there'}! 👋 I'm your AI Support Assistant powered by Groq AI.\n\nHow can I help you today? You can ask me troubleshooting questions or ask me to "raise a ticket" for your issue!`,
     },
   ]);
 
@@ -124,7 +124,7 @@ export default function ChatbotWidget() {
                   AI Support Assistant
                   <Sparkles className="w-3 h-3 text-amber-400" />
                 </h3>
-                <p className="text-[10px] text-slate-400">Powered by Groq Llama 3.1 8B</p>
+                <p className="text-[10px] text-slate-400">Powered by Groq AI</p>
               </div>
             </div>
 

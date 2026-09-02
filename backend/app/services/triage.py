@@ -11,13 +11,15 @@ Scans ticket subject and description to determine:
 import os
 import json
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (explicit path)
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "qwen/qwen3.6-27b"
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -154,7 +156,7 @@ Output ONLY valid JSON matching this schema:
         tags_str = str(raw_tags)
 
     reasoning = data.get("reasoning", "Classified by Groq llama-3.1-8b-instant LLM.")
-    tags_with_ai = f"{tags_str} | ai: llama-3.1-8b"
+    tags_with_ai = f"{tags_str} | ai: groq-qwen3.6-27b"
 
     print(f"[TRIAGE GROQ LLM] Classified '{subject[:30]}...' -> Dept: {department}, Urgency: {urgency}")
 
