@@ -1,23 +1,39 @@
 /**
- * AgentDashboard — Support agent console.
- * View assigned tickets, filter by urgency/department/status/response times,
- * view key metrics, and jump to manage ticket resolution.
+ * AgentDashboard — Support Agent Command Console.
  */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { StatusBadge, UrgencyBadge } from '../components/StatusBadge';
+import {
+  ShieldCheck,
+  RefreshCw,
+  Search,
+  Filter,
+  Ticket,
+  Sparkles,
+  Clock,
+  CheckCircle2,
+  AlertOctagon,
+  ChevronRight,
+  User,
+  SlidersHorizontal,
+  X
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function AgentDashboard() {
+  const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filters & Sorting
+  // Filters & Search
   const [statusFilter, setStatusFilter] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
-  const [sortBy, setSortBy] = useState('newest'); // "newest", "oldest"
+  const [sortBy, setSortBy] = useState('newest');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchTickets();
@@ -40,7 +56,6 @@ export default function AgentDashboard() {
     }
   };
 
-  // Format relative response time / ticket age
   const formatTicketAge = (dateString) => {
     const created = new Date(dateString);
     const now = new Date();
@@ -54,196 +69,228 @@ export default function AgentDashboard() {
     return `${diffDays}d ago`;
   };
 
-  // Metrics (calculated from all fetched assigned tickets)
+  // Client-side search filtering
+  const filteredTickets = tickets.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      t.ticket_number.toLowerCase().includes(q) ||
+      t.subject.toLowerCase().includes(q) ||
+      (t.client_name && t.client_name.toLowerCase().includes(q)) ||
+      t.department.toLowerCase().includes(q)
+    );
+  });
+
   const totalAssigned = tickets.length;
-  const newCount = tickets.filter(t => t.status === 'New').length;
-  const inProgressCount = tickets.filter(t => t.status === 'In Progress').length;
-  const highCriticalCount = tickets.filter(t => t.urgency === 'High' || t.urgency === 'Critical').length;
-  const resolvedCount = tickets.filter(t => t.status === 'Resolved').length;
+  const newCount = tickets.filter((t) => t.status === 'New').length;
+  const inProgressCount = tickets.filter((t) => t.status === 'In Progress').length;
+  const highCriticalCount = tickets.filter((t) => t.urgency === 'High' || t.urgency === 'Critical').length;
+  const resolvedCount = tickets.filter((t) => t.status === 'Resolved').length;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header Banner */}
+      <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/20 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Support Agent Console</h1>
-          <p className="text-sm text-surface-500 mt-1">Manage and resolve support tickets assigned to you</p>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-2">
+            <ShieldCheck className="w-3.5 h-3.5" /> Support Agent Console • {user?.department || 'All Departments'}
+          </div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            Agent Dashboard
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Manage incoming customer support tickets, triage analysis, and status resolution workflows.
+          </p>
         </div>
+
         <button
           onClick={fetchTickets}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-surface-200 text-surface-700 font-semibold rounded-lg hover:bg-surface-50 transition-colors text-sm cursor-pointer shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer shrink-0"
         >
-          🔄 Refresh Tickets
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Console
         </button>
       </div>
 
-      {/* Summary Cards */}
+      {/* Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Assigned</p>
-          <p className="text-2xl font-extrabold text-surface-900 mt-1">{totalAssigned}</p>
+        <div className="glass-card p-4 rounded-2xl border-l-4 border-l-slate-400 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Assigned</p>
+          <p className="text-2xl font-extrabold text-white">{totalAssigned}</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">New</p>
-          <p className="text-2xl font-extrabold text-purple-700 mt-1">{newCount}</p>
+        <div className="glass-card p-4 rounded-2xl border-l-4 border-l-purple-500 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-purple-400">New</p>
+          <p className="text-2xl font-extrabold text-purple-400">{newCount}</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">In Progress</p>
-          <p className="text-2xl font-extrabold text-amber-700 mt-1">{inProgressCount}</p>
+        <div className="glass-card p-4 rounded-2xl border-l-4 border-l-amber-500 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400">In Progress</p>
+          <p className="text-2xl font-extrabold text-amber-400">{inProgressCount}</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">High / Critical</p>
-          <p className="text-2xl font-extrabold text-red-700 mt-1">{highCriticalCount}</p>
+        <div className="glass-card p-4 rounded-2xl border-l-4 border-l-red-500 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-red-400">High / Critical</p>
+          <p className="text-2xl font-extrabold text-red-400">{highCriticalCount}</p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Resolved</p>
-          <p className="text-2xl font-extrabold text-emerald-700 mt-1">{resolvedCount}</p>
+        <div className="glass-card p-4 rounded-2xl border-l-4 border-l-emerald-500 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Resolved</p>
+          <p className="text-2xl font-extrabold text-emerald-400">{resolvedCount}</p>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-[var(--shadow-card)] flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-4 items-center">
-          <span className="text-xs font-bold uppercase tracking-wider text-surface-400">Filters:</span>
+      {/* Search & Filter Bar */}
+      <div className="glass-panel p-4 rounded-2xl space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Real-time search */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by ticket #, subject, client..."
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-surface-300 text-xs font-medium bg-white text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100"
-          >
-            <option value="">All Statuses</option>
-            <option value="New">New</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
+          {/* Filter Dropdowns */}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="New">New</option>
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
 
-          {/* Urgency Filter */}
-          <select
-            value={urgencyFilter}
-            onChange={(e) => setUrgencyFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-surface-300 text-xs font-medium bg-white text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100"
-          >
-            <option value="">All Urgencies</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+            <select
+              value={urgencyFilter}
+              onChange={(e) => setUrgencyFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Urgencies</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
 
-          {/* Department Filter */}
-          <select
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-surface-300 text-xs font-medium bg-white text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100"
-          >
-            <option value="">All Departments</option>
-            <option value="Technical Support">Technical Support</option>
-            <option value="Billing">Billing</option>
-            <option value="Account Support">Account Support</option>
-            <option value="General Support">General Support</option>
-          </select>
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Departments</option>
+              <option value="Technical Support">Technical Support</option>
+              <option value="Billing">Billing</option>
+              <option value="Account Support">Account Support</option>
+              <option value="General Support">General Support</option>
+            </select>
 
-          {/* Response Time / Age Sort */}
-          <div className="flex items-center gap-1.5 border-l border-surface-200 pl-4">
-            <span className="text-xs text-surface-400 font-medium">Response Time:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-surface-300 text-xs font-medium bg-white text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-500"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First (SLA Priority)</option>
             </select>
+
+            {(statusFilter || urgencyFilter || departmentFilter || sortBy !== 'newest' || searchQuery) && (
+              <button
+                onClick={() => {
+                  setStatusFilter('');
+                  setUrgencyFilter('');
+                  setDepartmentFilter('');
+                  setSortBy('newest');
+                  setSearchQuery('');
+                }}
+                className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-colors"
+                title="Clear Filters"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
-
-        {(statusFilter || urgencyFilter || departmentFilter || sortBy !== 'newest') && (
-          <button
-            onClick={() => {
-              setStatusFilter('');
-              setUrgencyFilter('');
-              setDepartmentFilter('');
-              setSortBy('newest');
-            }}
-            className="text-xs text-red-600 hover:text-red-800 font-semibold transition-colors"
-          >
-            Clear Filters
-          </button>
-        )}
       </div>
 
-      {/* Tickets Table */}
-      <div className="bg-white rounded-xl border border-surface-200 shadow-[var(--shadow-card)] overflow-hidden">
+      {/* Table Container */}
+      <div className="glass-panel rounded-2xl overflow-hidden shadow-xl">
         {error && (
-          <div className="p-4 bg-red-50 text-red-700 text-sm border-b border-red-100">
+          <div className="p-4 bg-red-500/10 border-b border-red-500/20 text-red-400 text-xs">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="p-12 text-center text-surface-400">
-            <div className="animate-spin inline-block h-6 w-6 border-2 border-primary-500 border-t-transparent rounded-full mb-2"></div>
-            <p className="text-sm">Loading tickets...</p>
+          <div className="p-12 text-center text-slate-500 space-y-2">
+            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-xs">Fetching assigned tickets...</p>
           </div>
-        ) : tickets.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-3xl mb-2 font-mono">📋</p>
-            <h3 className="text-base font-semibold text-surface-800 mb-1">No tickets match criteria</h3>
-            <p className="text-sm text-surface-500">Try adjusting your filters or check back later.</p>
+        ) : filteredTickets.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto">
+              <Ticket className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-200">No tickets match criteria</h3>
+            <p className="text-xs text-slate-400">Try adjusting your filters or search query.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-surface-50 border-b border-surface-200 text-surface-500 text-xs font-semibold uppercase tracking-wider">
+                <tr className="bg-slate-900/60 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
                   <th className="py-3.5 px-5">Ticket #</th>
                   <th className="py-3.5 px-5">Subject</th>
                   <th className="py-3.5 px-5">Client</th>
                   <th className="py-3.5 px-5">Department</th>
                   <th className="py-3.5 px-5">Urgency</th>
                   <th className="py-3.5 px-5">Status</th>
-                  <th className="py-3.5 px-5">Age / Response Time</th>
+                  <th className="py-3.5 px-5">Age / SLA Response</th>
                   <th className="py-3.5 px-5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-100">
-                {tickets.map((t) => (
-                  <tr key={t.id} className="hover:bg-surface-50/80 transition-colors">
-                    <td className="py-3.5 px-5 font-mono text-xs font-semibold text-surface-700">
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {filteredTickets.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-900/40 transition-colors">
+                    <td className="py-4 px-5 font-mono font-bold text-indigo-400 whitespace-nowrap">
                       {t.ticket_number}
                     </td>
-                    <td className="py-3.5 px-5 font-medium text-surface-900 max-w-xs truncate">
+                    <td className="py-4 px-5 font-semibold text-white max-w-xs truncate">
                       {t.subject}
                     </td>
-                    <td className="py-3.5 px-5 text-surface-700 text-xs font-medium">
-                      {t.client_name || 'Client'}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-300">
+                        <User className="w-3.5 h-3.5 text-slate-500" />
+                        {t.client_name || 'Client'}
+                      </div>
                     </td>
-                    <td className="py-3.5 px-5 text-surface-600 text-xs">
+                    <td className="py-4 px-5 text-slate-400 font-medium whitespace-nowrap">
                       {t.department}
                     </td>
-                    <td className="py-3.5 px-5">
+                    <td className="py-4 px-5 whitespace-nowrap">
                       <UrgencyBadge urgency={t.urgency} />
                     </td>
-                    <td className="py-3.5 px-5">
+                    <td className="py-4 px-5 whitespace-nowrap">
                       <StatusBadge status={t.status} />
                     </td>
-                    <td className="py-3.5 px-5 text-surface-600 text-xs whitespace-nowrap font-medium">
-                      <span className="inline-flex items-center gap-1 bg-surface-100 px-2 py-0.5 rounded text-surface-700">
-                        ⏱️ {formatTicketAge(t.created_at)}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-semibold text-slate-300">
+                        <Clock className="w-3 h-3 text-indigo-400" />
+                        {formatTicketAge(t.created_at)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 text-right">
+                    <td className="py-4 px-5 text-right whitespace-nowrap">
                       <Link
                         to={`/agent/tickets/${t.id}`}
-                        className="px-3 py-1.5 bg-primary-50 text-primary-700 font-semibold rounded text-xs hover:bg-primary-100 transition-colors inline-block"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-bold text-xs transition-all shadow-sm"
                       >
-                        Manage →
+                        Manage <ChevronRight className="w-3.5 h-3.5" />
                       </Link>
                     </td>
                   </tr>

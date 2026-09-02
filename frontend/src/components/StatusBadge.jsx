@@ -1,36 +1,93 @@
 /**
- * StatusBadge — colored badge for ticket status and urgency.
- * Provides consistent visual indicators across the app.
+ * StatusBadge & UrgencyBadge — Premium visual indicators with Lucide icons.
  */
-
-const STATUS_STYLES = {
-  'New': 'bg-purple-50 text-purple-700 ring-purple-200',
-  'Open': 'bg-blue-50 text-blue-700 ring-blue-200',
-  'In Progress': 'bg-amber-50 text-amber-700 ring-amber-200',
-  'Resolved': 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-};
-
-const URGENCY_STYLES = {
-  'Low': 'bg-green-50 text-green-700 ring-green-200',
-  'Medium': 'bg-yellow-50 text-yellow-700 ring-yellow-200',
-  'High': 'bg-orange-50 text-orange-700 ring-orange-200',
-  'Critical': 'bg-red-50 text-red-700 ring-red-200',
-};
+import {
+  Sparkles,
+  FolderOpen,
+  Clock,
+  CheckCircle2,
+  Flame,
+  AlertTriangle,
+  AlertCircle,
+  Info
+} from 'lucide-react';
 
 export function StatusBadge({ status }) {
-  const style = STATUS_STYLES[status] || 'bg-surface-100 text-surface-600 ring-surface-200';
+  const configs = {
+    'New': {
+      label: 'New',
+      icon: Sparkles,
+      style: 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+    },
+    'Open': {
+      label: 'Open',
+      icon: FolderOpen,
+      style: 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+    },
+    'In Progress': {
+      label: 'In Progress',
+      icon: Clock,
+      style: 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+    },
+    'Resolved': {
+      label: 'Resolved',
+      icon: CheckCircle2,
+      style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+    }
+  };
+
+  const config = configs[status] || {
+    label: status,
+    icon: Info,
+    style: 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+  };
+
+  const Icon = config.icon;
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${style}`}>
-      {status}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${config.style} whitespace-nowrap shadow-sm`}>
+      <Icon className="w-3.5 h-3.5" />
+      {config.label}
     </span>
   );
 }
 
 export function UrgencyBadge({ urgency }) {
-  const style = URGENCY_STYLES[urgency] || 'bg-surface-100 text-surface-600 ring-surface-200';
+  const configs = {
+    'Critical': {
+      label: 'Critical',
+      icon: Flame,
+      style: 'bg-red-500/15 text-red-400 border-red-500/30 ring-1 ring-red-500/20'
+    },
+    'High': {
+      label: 'High',
+      icon: AlertTriangle,
+      style: 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+    },
+    'Medium': {
+      label: 'Medium',
+      icon: AlertCircle,
+      style: 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+    },
+    'Low': {
+      label: 'Low',
+      icon: Info,
+      style: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+    }
+  };
+
+  const config = configs[urgency] || {
+    label: urgency,
+    icon: Info,
+    style: 'bg-slate-500/15 text-slate-400 border-slate-500/30'
+  };
+
+  const Icon = config.icon;
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${style}`}>
-      {urgency}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${config.style} whitespace-nowrap shadow-sm`}>
+      <Icon className="w-3.5 h-3.5" />
+      {config.label}
     </span>
   );
 }
