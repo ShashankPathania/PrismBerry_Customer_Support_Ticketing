@@ -1,3 +1,6 @@
+# Prompt / instructions file
+mainPrompt.md
+
 # Dependencies
 node_modules/
 backend/venv/
