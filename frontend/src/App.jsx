@@ -1,6 +1,6 @@
 /**
  * App — Main application entry point with Router, AuthProvider,
- * and role-protected layout routes.
+ * and role-protected layout routes for Client, Agent, and Admin.
  */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -15,12 +15,21 @@ import CreateTicket from './pages/CreateTicket';
 import TicketDetails from './pages/TicketDetails';
 import AgentDashboard from './pages/AgentDashboard';
 import AgentTicketDetails from './pages/AgentTicketDetails';
+import AdminDashboard from './pages/AdminDashboard';
 
 function RootRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'agent' ? '/agent/dashboard' : '/dashboard'} replace />;
+
+  const path =
+    user.role === 'admin'
+      ? '/admin/dashboard'
+      : user.role === 'agent'
+      ? '/agent/dashboard'
+      : '/dashboard';
+
+  return <Navigate to={path} replace />;
 }
 
 export default function App() {
@@ -58,6 +67,17 @@ export default function App() {
           >
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
             <Route path="/agent/tickets/:id" element={<AgentTicketDetails />} />
+          </Route>
+
+          {/* System Admin Routes */}
+          <Route
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Route>
 
           {/* Fallback */}

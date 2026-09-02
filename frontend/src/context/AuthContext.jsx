@@ -13,7 +13,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // On mount, check if we have a stored token and validate it
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
@@ -33,7 +32,9 @@ export function AuthProvider({ children }) {
     setUser(userData);
 
     // Redirect based on role
-    if (userData.role === 'agent') {
+    if (userData.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userData.role === 'agent') {
       navigate('/agent/dashboard');
     } else {
       navigate('/dashboard');

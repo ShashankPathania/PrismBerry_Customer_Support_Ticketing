@@ -12,7 +12,14 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
-    role: str = "client"  # Default to client; agents are seeded
+    role: str = "client"
+
+
+class AgentCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    department: str = "General Support"
 
 
 class UserLogin(BaseModel):
@@ -29,9 +36,10 @@ class UserResponse(BaseModel):
     role: str
     department: Optional[str] = None
     created_at: datetime
+    active_tickets_count: Optional[int] = 0
 
     class Config:
-        from_attributes = True  # Allows creating from SQLAlchemy model
+        from_attributes = True
 
 
 class Token(BaseModel):

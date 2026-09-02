@@ -62,7 +62,14 @@ def seed_database(db: Session):
         department="General Support",
     )
 
-    db.add_all([client, tech_agent, billing_agent, account_agent, general_agent])
+    admin = User(
+        name="System Admin",
+        email="admin@example.com",
+        password_hash=hashed,
+        role="admin",
+    )
+
+    db.add_all([admin, client, tech_agent, billing_agent, account_agent, general_agent])
     db.commit()
     db.refresh(client)
 

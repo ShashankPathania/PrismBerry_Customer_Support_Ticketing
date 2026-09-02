@@ -1,11 +1,25 @@
 /**
  * Login page — Modern SaaS Auth screen with ambient backdrop gradients,
- * input group icons, and instant 1-click Demo Account switches.
+ * input group icons, and instant 1-click Demo Account switches for ALL roles.
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, Ticket, ArrowRight, ShieldCheck, UserCheck, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  Ticket,
+  ArrowRight,
+  ShieldCheck,
+  UserCheck,
+  AlertCircle,
+  Loader2,
+  Crown,
+  Wrench,
+  CreditCard,
+  KeyRound,
+  Headphones
+} from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
@@ -43,13 +57,22 @@ export default function Login() {
     handleSubmit(null, demoEmail, 'password123');
   };
 
+  const demoAccounts = [
+    { label: 'Client', email: 'client@example.com', icon: UserCheck, color: 'text-emerald-400', border: 'border-emerald-500/30' },
+    { label: 'Tech Agent', email: 'tech@example.com', icon: Wrench, color: 'text-indigo-400', border: 'border-indigo-500/30' },
+    { label: 'Billing Agent', email: 'billing@example.com', icon: CreditCard, color: 'text-amber-400', border: 'border-amber-500/30' },
+    { label: 'Account Agent', email: 'account@example.com', icon: KeyRound, color: 'text-purple-400', border: 'border-purple-500/30' },
+    { label: 'General Agent', email: 'general@example.com', icon: Headphones, color: 'text-sky-400', border: 'border-sky-500/30' },
+    { label: 'System Admin', email: 'admin@example.com', icon: Crown, color: 'text-yellow-400', border: 'border-yellow-500/30' },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Ambient background glow */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-lg z-10 space-y-6">
+      <div className="w-full max-w-xl z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
@@ -59,7 +82,7 @@ export default function Login() {
             Welcome back to <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">PrismBerry</span>
           </h1>
           <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            Sign in to manage support tickets or raise a new request
+            Sign in to your client, agent, or admin workspace
           </p>
         </div>
 
@@ -121,7 +144,7 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  Sign In to Dashboard
+                  Sign In to Workspace
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -131,35 +154,20 @@ export default function Login() {
           {/* Quick Demo Login Preset Buttons */}
           <div className="pt-4 border-t border-slate-800 space-y-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">
-              Instant 1-Click Demo Login
+              Instant 1-Click Demo Login (All Roles)
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('client@example.com')}
-                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-xs font-medium text-slate-300 hover:text-white flex flex-col items-center gap-1 transition-all cursor-pointer text-center"
-              >
-                <UserCheck className="w-4 h-4 text-emerald-400" />
-                <span>Client</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('tech@example.com')}
-                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-xs font-medium text-slate-300 hover:text-white flex flex-col items-center gap-1 transition-all cursor-pointer text-center"
-              >
-                <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                <span>Tech Agent</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('billing@example.com')}
-                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-xs font-medium text-slate-300 hover:text-white flex flex-col items-center gap-1 transition-all cursor-pointer text-center"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
-                <span>Billing Agent</span>
-              </button>
+              {demoAccounts.map(({ label, email: dEmail, icon: Icon, color, border }) => (
+                <button
+                  key={dEmail}
+                  type="button"
+                  onClick={() => handleQuickLogin(dEmail)}
+                  className={`p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border ${border} text-xs font-medium text-slate-300 hover:text-white flex flex-col items-center gap-1 transition-all cursor-pointer text-center group`}
+                >
+                  <Icon className={`w-4 h-4 ${color} group-hover:scale-110 transition-transform`} />
+                  <span className="font-semibold text-[11px]">{label}</span>
+                </button>
+              ))}
             </div>
           </div>
 

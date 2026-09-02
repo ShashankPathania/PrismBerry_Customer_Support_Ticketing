@@ -2,6 +2,7 @@
  * Sidebar — Responsive navigation sidebar.
  * Desktop: fixed side panel.
  * Mobile: drawer slide-over with hamburger toggle.
+ * Supports Client, Agent, and Admin roles.
  */
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,8 @@ import {
   User,
   Ticket,
   Sparkles,
+  Crown,
+  Users,
   X
 } from 'lucide-react';
 
@@ -28,7 +31,13 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: '/agent/dashboard', label: 'Agent Console', icon: LayoutDashboard },
   ];
 
-  const links = user?.role === 'agent' ? agentLinks : clientLinks;
+  const adminLinks = [
+    { to: '/admin/dashboard', label: 'Admin Portal', icon: Crown },
+  ];
+
+  let links = clientLinks;
+  if (user?.role === 'agent') links = agentLinks;
+  if (user?.role === 'admin') links = adminLinks;
 
   return (
     <>
@@ -102,12 +111,26 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="p-4 border-t border-slate-800/80 bg-slate-900/60">
           <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-bold text-sm">
-              {user?.role === 'agent' ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
+              {user?.role === 'admin' ? (
+                <Crown className="w-5 h-5 text-yellow-400" />
+              ) : user?.role === 'agent' ? (
+                <ShieldCheck className="w-5 h-5 text-indigo-400" />
+              ) : (
+                <User className="w-5 h-5 text-emerald-400" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-slate-200 truncate">{user?.name}</p>
               <p className="text-[10px] font-medium text-slate-400 capitalize flex items-center gap-1">
-                <span className={`w-1.5 h-1.5 rounded-full ${user?.role === 'agent' ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    user?.role === 'admin'
+                      ? 'bg-yellow-400'
+                      : user?.role === 'agent'
+                      ? 'bg-amber-400'
+                      : 'bg-emerald-400'
+                  }`}
+                ></span>
                 {user?.role} {user?.department ? `• ${user.department}` : ''}
               </p>
             </div>
