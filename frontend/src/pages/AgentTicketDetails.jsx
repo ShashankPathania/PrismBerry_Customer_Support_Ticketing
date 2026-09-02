@@ -1,8 +1,13 @@
 /**
- * AgentTicketDetails — Dedicated agent workspace for resolving tickets with
- * AI Reply Suggestions powered by Groq llama-3.1-8b-instant.
+ * AgentTicketDetails — Dedicated agent workspace for resolving tickets.
+ * Includes:
+ *  - Reply composer for sending responses to clients
+ *  - Full conversation thread display
+ *  - AI Reply Suggestions powered by Groq
+ *  - Status lifecycle controls
+ *  - Automated triage breakdown
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { StatusBadge, UrgencyBadge } from '../components/StatusBadge';
@@ -23,7 +28,9 @@ import {
   Bot,
   Copy,
   Check,
-  MessageSquare
+  MessageSquare,
+  Send,
+  MessagesSquare
 } from 'lucide-react';
 
 export default function AgentTicketDetails() {
@@ -34,6 +41,12 @@ export default function AgentTicketDetails() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Response/Reply state
+  const [responses, setResponses] = useState([]);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const threadEndRef = useRef(null);
+
   // AI Reply Generator State
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
@@ -41,7 +54,12 @@ export default function AgentTicketDetails() {
 
   useEffect(() => {
     fetchTicket();
+    fetchResponses();
   }, [id]);
+
+  useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [responses]);
 
   const fetchTicket = async () => {
     try {
@@ -55,21 +73,48 @@ export default function AgentTicketDetails() {
     }
   };
 
+  const fetchResponses = async () => {
+    try {
+      const res = await api.get(`/tickets/${id}/responses`);
+      setResponses(res.data);
+    } catch (err) {
+      // silently ignore if no responses yet
+    }
+  };
+
   const handleStatusChange = async (newStatus) => {
     try {
       setUpdating(true);
       setError('');
       setSuccessMsg('');
-
       const response = await api.patch(`/tickets/${id}/status`, { status: newStatus });
       setTicket(response.data);
       setSuccessMsg(`Status updated to "${newStatus}"`);
-
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update ticket status.');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || sendingReply) return;
+
+    try {
+      setSendingReply(true);
+      setError('');
+      await api.post(`/tickets/${id}/responses`, { message: replyText });
+      setReplyText('');
+      setSuccessMsg('Reply sent successfully.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+      fetchResponses();
+      fetchTicket(); // refresh status if it auto-changed
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send reply.');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -83,6 +128,12 @@ export default function AgentTicketDetails() {
       setError(err.response?.data?.detail || 'Failed to generate AI reply suggestion.');
     } finally {
       setLoadingAi(false);
+    }
+  };
+
+  const handleUseSuggestion = () => {
+    if (aiSuggestion?.suggested_reply) {
+      setReplyText(aiSuggestion.suggested_reply);
     }
   };
 
@@ -199,65 +250,147 @@ export default function AgentTicketDetails() {
             )}
           </div>
 
-          {/* AI Agent Reply Generator Tool */}
-          <div className="glass-panel p-6 rounded-2xl border border-indigo-500/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
-                <Bot className="w-4 h-4 text-purple-400" /> Agent AI Assistant • Tailored Reply Suggestion
+          {/* ====== Conversation Thread ====== */}
+          <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <MessagesSquare className="w-4 h-4 text-indigo-400" /> Conversation Thread
+                <span className="text-[10px] bg-indigo-500/15 text-indigo-300 px-2 py-0.5 rounded-full font-bold">
+                  {responses.length} {responses.length === 1 ? 'reply' : 'replies'}
+                </span>
               </h2>
-              <button
-                onClick={handleGenerateAiReply}
-                disabled={loadingAi}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-600/20 hover:opacity-95 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {loadingAi ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-400" /> Generate AI Suggestion
-                  </>
-                )}
-              </button>
             </div>
 
-            {aiSuggestion && (
-              <div className="space-y-4 pt-2 animate-fade-in">
-                {aiSuggestion.key_points && (
-                  <div className="flex flex-wrap gap-2">
-                    {aiSuggestion.key_points.map((point, idx) => (
-                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-semibold">
-                        • {point}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="relative">
-                  <textarea
-                    readOnly
-                    rows={6}
-                    value={aiSuggestion.suggested_reply}
-                    className="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs font-mono leading-relaxed focus:outline-none"
-                  />
-                  <button
-                    onClick={handleCopySuggestion}
-                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+            {/* Messages list */}
+            <div className="max-h-[420px] overflow-y-auto p-5 space-y-4">
+              {responses.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 space-y-2">
+                  <MessageSquare className="w-8 h-8 mx-auto text-slate-600" />
+                  <p className="text-xs font-semibold">No replies yet. Send the first response to this client.</p>
+                </div>
+              ) : (
+                responses.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`flex gap-3 ${r.author_role === 'agent' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-300" /> Copied!
-                      </>
+                    {r.author_role !== 'agent' && (
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
+
+                    <div className={`max-w-[80%] space-y-1 ${r.author_role === 'agent' ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-300">{r.author_name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                          r.author_role === 'agent'
+                            ? 'bg-indigo-500/15 text-indigo-300'
+                            : 'bg-emerald-500/15 text-emerald-300'
+                        }`}>
+                          {r.author_role === 'agent' ? 'Agent' : 'Client'}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{new Date(r.created_at).toLocaleString()}</span>
+                      </div>
+                      <div
+                        className={`p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap break-words ${
+                          r.author_role === 'agent'
+                            ? 'bg-indigo-600/15 border border-indigo-500/25 text-slate-200 rounded-br-none'
+                            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none'
+                        }`}
+                      >
+                        {r.message}
+                      </div>
+                    </div>
+
+                    {r.author_role === 'agent' && (
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              <div ref={threadEndRef} />
+            </div>
+
+            {/* Reply Composer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900/40">
+              <form onSubmit={handleSendReply} className="space-y-3">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Type your response to the client..."
+                  rows={3}
+                  className="w-full p-4 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 leading-relaxed focus:outline-none focus:border-indigo-500 resize-none"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiReply}
+                    disabled={loadingAi}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/15 border border-purple-500/25 text-purple-300 text-[11px] font-semibold hover:bg-purple-600/25 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {loadingAi ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
                     ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copy Reply
-                      </>
+                      <><Sparkles className="w-3.5 h-3.5 text-amber-400" /> AI Suggest Reply</>
+                    )}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={sendingReply || !replyText.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 hover:opacity-95 disabled:opacity-40 transition-all cursor-pointer"
+                  >
+                    {sendingReply ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                    ) : (
+                      <><Send className="w-4 h-4" /> Send Reply</>
                     )}
                   </button>
                 </div>
-              </div>
-            )}
+              </form>
+
+              {/* AI Suggestion Panel */}
+              {aiSuggestion && (
+                <div className="mt-4 p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-purple-300 flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5" /> AI Generated Suggestion
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleUseSuggestion}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-500 transition-all cursor-pointer"
+                      >
+                        Use as Reply
+                      </button>
+                      <button
+                        onClick={handleCopySuggestion}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold hover:bg-slate-700 transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
+                      </button>
+                    </div>
+                  </div>
+
+                  {aiSuggestion.key_points && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiSuggestion.key_points.map((point, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-400 text-[10px] font-medium">
+                          {point}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                    {aiSuggestion.suggested_reply}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Automated Triage Breakdown */}

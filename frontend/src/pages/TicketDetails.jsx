@@ -1,7 +1,9 @@
 /**
- * TicketDetails — Client ticket view.
+ * TicketDetails — Client ticket view with conversation thread.
+ * Clients can view their ticket details, see agent responses,
+ * and reply back in the conversation thread.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { StatusBadge, UrgencyBadge } from '../components/StatusBadge';
@@ -15,7 +17,11 @@ import {
   Download,
   AlertCircle,
   Tag,
-  ShieldCheck
+  ShieldCheck,
+  MessagesSquare,
+  MessageSquare,
+  Send,
+  Loader2
 } from 'lucide-react';
 
 export default function TicketDetails() {
@@ -24,9 +30,21 @@ export default function TicketDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Response state
+  const [responses, setResponses] = useState([]);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replySuccess, setReplySuccess] = useState('');
+  const threadEndRef = useRef(null);
+
   useEffect(() => {
     fetchTicket();
+    fetchResponses();
   }, [id]);
+
+  useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [responses]);
 
   const fetchTicket = async () => {
     try {
@@ -40,6 +58,34 @@ export default function TicketDetails() {
     }
   };
 
+  const fetchResponses = async () => {
+    try {
+      const res = await api.get(`/tickets/${id}/responses`);
+      setResponses(res.data);
+    } catch (err) {
+      // silently ignore
+    }
+  };
+
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || sendingReply) return;
+
+    try {
+      setSendingReply(true);
+      setError('');
+      await api.post(`/tickets/${id}/responses`, { message: replyText });
+      setReplyText('');
+      setReplySuccess('Reply sent!');
+      setTimeout(() => setReplySuccess(''), 3000);
+      fetchResponses();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send reply.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -48,7 +94,7 @@ export default function TicketDetails() {
     );
   }
 
-  if (error || !ticket) {
+  if (error && !ticket) {
     return (
       <div className="glass-panel p-8 rounded-2xl text-center space-y-4 max-w-xl mx-auto">
         <AlertCircle className="w-10 h-10 text-red-400 mx-auto" />
@@ -107,6 +153,107 @@ export default function TicketDetails() {
                   <Download className="w-4 h-4" />
                   {ticket.attachment_name || 'Download Attachment'}
                 </a>
+              </div>
+            )}
+          </div>
+
+          {/* ====== Conversation Thread ====== */}
+          <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800">
+            <div className="p-5 border-b border-slate-800">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <MessagesSquare className="w-4 h-4 text-indigo-400" /> Conversation
+                <span className="text-[10px] bg-indigo-500/15 text-indigo-300 px-2 py-0.5 rounded-full font-bold">
+                  {responses.length} {responses.length === 1 ? 'reply' : 'replies'}
+                </span>
+              </h2>
+            </div>
+
+            {/* Messages */}
+            <div className="max-h-[400px] overflow-y-auto p-5 space-y-4">
+              {responses.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 space-y-2">
+                  <MessageSquare className="w-8 h-8 mx-auto text-slate-600" />
+                  <p className="text-xs font-semibold">No replies yet. A support agent will respond shortly.</p>
+                  <p className="text-[10px] text-slate-600">You can also send a message to provide more details.</p>
+                </div>
+              ) : (
+                responses.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`flex gap-3 ${r.author_role === 'client' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {r.author_role !== 'client' && (
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                    )}
+
+                    <div className={`max-w-[80%] space-y-1 ${r.author_role === 'client' ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-300">{r.author_name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                          r.author_role === 'agent'
+                            ? 'bg-indigo-500/15 text-indigo-300'
+                            : 'bg-emerald-500/15 text-emerald-300'
+                        }`}>
+                          {r.author_role === 'agent' ? 'Support Agent' : 'You'}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{new Date(r.created_at).toLocaleString()}</span>
+                      </div>
+                      <div
+                        className={`p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap break-words ${
+                          r.author_role === 'client'
+                            ? 'bg-emerald-600/10 border border-emerald-500/20 text-slate-200 rounded-br-none'
+                            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none'
+                        }`}
+                      >
+                        {r.message}
+                      </div>
+                    </div>
+
+                    {r.author_role === 'client' && (
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              <div ref={threadEndRef} />
+            </div>
+
+            {/* Client Reply Box */}
+            {ticket.status !== 'Resolved' && (
+              <div className="p-4 border-t border-slate-800 bg-slate-900/40">
+                <form onSubmit={handleSendReply} className="flex items-end gap-3">
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Add a reply or provide more details..."
+                    rows={2}
+                    className="flex-1 p-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 leading-relaxed focus:outline-none focus:border-indigo-500 resize-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingReply || !replyText.trim()}
+                    className="p-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white disabled:opacity-40 transition-all cursor-pointer shadow-lg shrink-0"
+                  >
+                    {sendingReply ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </button>
+                </form>
+                {replySuccess && (
+                  <p className="text-[11px] text-emerald-400 font-semibold mt-2">{replySuccess}</p>
+                )}
+              </div>
+            )}
+
+            {ticket.status === 'Resolved' && (
+              <div className="p-4 border-t border-slate-800 bg-emerald-500/5 text-center">
+                <p className="text-xs text-emerald-400 font-semibold">This ticket has been resolved. No further replies can be added.</p>
               </div>
             )}
           </div>

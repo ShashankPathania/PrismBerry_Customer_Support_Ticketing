@@ -12,16 +12,36 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel
 
 from app.models.user import User
 from app.models.ticket import Ticket
+from app.models.response import Response as ResponseModel
 from app.schemas.ticket import TicketResponse, TicketUpdate, StatusUpdate
 from app.dependencies import get_db, get_current_user
 from app.services.triage import classify_ticket
 from app.services.assignment import assign_agent
 
 router = APIRouter(prefix="/api/tickets", tags=["Tickets"])
+
+
+# --- Response Schemas (inline for simplicity) ---
+
+class ResponseCreate(BaseModel):
+    message: str
+
+class ResponseOut(BaseModel):
+    id: int
+    ticket_id: int
+    author_id: int
+    author_name: str
+    author_role: str
+    message: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # Directory for uploaded attachments
 UPLOAD_DIR = "uploads"
@@ -253,3 +273,85 @@ def update_ticket_status(
     db.refresh(ticket)
 
     return _ticket_to_response(ticket)
+
+
+# ======================================================================
+#  Ticket Responses / Replies
+# ======================================================================
+
+def _response_to_out(resp: ResponseModel) -> ResponseOut:
+    """Convert a Response ORM object to a ResponseOut schema."""
+    return ResponseOut(
+        id=resp.id,
+        ticket_id=resp.ticket_id,
+        author_id=resp.author_id,
+        author_name=resp.author.name if resp.author else "Unknown",
+        author_role=resp.author.role if resp.author else "unknown",
+        message=resp.message,
+        created_at=resp.created_at,
+    )
+
+
+@router.get("/{ticket_id}/responses", response_model=List[ResponseOut])
+def list_responses(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all responses/replies for a ticket, ordered by creation time."""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Authorization: clients only see their own ticket threads
+    if current_user.role == "client" and ticket.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == "agent" and ticket.assigned_agent_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    responses = (
+        db.query(ResponseModel)
+        .filter(ResponseModel.ticket_id == ticket_id)
+        .order_by(ResponseModel.created_at.asc())
+        .all()
+    )
+
+    return [_response_to_out(r) for r in responses]
+
+
+@router.post("/{ticket_id}/responses", response_model=ResponseOut, status_code=status.HTTP_201_CREATED)
+def create_response(
+    ticket_id: int,
+    body: ResponseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Post a reply/response to a ticket. Both agents and clients can respond."""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Authorization
+    if current_user.role == "client" and ticket.client_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == "agent" and ticket.assigned_agent_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not assigned to you")
+
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Response message cannot be empty")
+
+    # Auto-open the ticket when the agent sends the first reply
+    if current_user.role == "agent" and ticket.status == "New":
+        ticket.status = "Open"
+
+    resp = ResponseModel(
+        ticket_id=ticket_id,
+        author_id=current_user.id,
+        message=body.message.strip(),
+    )
+
+    db.add(resp)
+    db.commit()
+    db.refresh(resp)
+
+    return _response_to_out(resp)

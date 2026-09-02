@@ -39,3 +39,4 @@ class Ticket(Base):
     # Relationships for easy querying
     client = relationship("User", foreign_keys=[client_id])
     assigned_agent = relationship("User", foreign_keys=[assigned_agent_id])
+    responses = relationship("Response", back_populates="ticket", order_by="Response.created_at")

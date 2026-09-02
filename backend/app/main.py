@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import engine, Base, SessionLocal
 from app.models.user import User
 from app.models.ticket import Ticket
+from app.models.response import Response
 from app.routers import auth, tickets, admin, chatbot
 from app.seed import seed_database
 
